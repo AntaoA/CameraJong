@@ -27,8 +27,7 @@ sealed class Grouping {
         }
     }
 
-    data class Pair(override val tiles: List<Tile>) : Grouping() {
-        override val isExposed = false
+    data class Pair(override val tiles: List<Tile>, override val isExposed: Boolean) : Grouping() {
         init {
             require(tiles.size == 2) { "A Pair must have exactly 2 tiles." }
             require(areTilesIdentical(tiles)) { "A Pair must consist of 2 identical tiles." }
