@@ -13,7 +13,7 @@ class ManualScorerViewModel(private val engine: ScoringEngine) : ViewModel() {
     val scoreResult = _scoreResult.asStateFlow()
 
     var winType = WinType.DISCARD
-    var waitType = WaitType.SINGLE
+    var waitType = WaitType.MULTI
     var seatWind = Wind.EAST
     var prevalentWind = Wind.EAST
 
