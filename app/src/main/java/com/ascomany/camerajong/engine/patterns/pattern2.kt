@@ -3,6 +3,8 @@ package com.ascomany.camerajong.engine.patterns
 import com.ascomany.camerajong.engine.Grouping
 import com.ascomany.camerajong.engine.Tile
 import com.ascomany.camerajong.engine.WinType
+import com.ascomany.camerajong.engine.isTerminalOrHonor
+
 
 val pattern2 = listOf(
     Pattern(
@@ -105,5 +107,20 @@ val pattern2 = listOf(
         points = 2,
         excludedPatternIds = emptyList(),
         check = { hand -> hand.groupings.count { it is Grouping.Kong && !it.isExposed } }
+    ),
+    Pattern(
+        id = 68,
+        name = "All Simple",
+        description = "A hand formed without Terminal or Honor Tiles.",
+        points = 2,
+        excludedPatternIds = emptyList(),
+        check = { hand ->
+            val allSimple = hand.groupings.all { g ->
+                g.tiles.all { t ->
+                    !t.isTerminalOrHonor() // Ajout de l'opérateur de négation '!'
+                }
+            }
+            if (allSimple) 1 else 0
+        }
     )
 )
