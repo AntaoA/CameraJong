@@ -3,7 +3,7 @@ package com.ascomany.camerajong.ui.manual
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,11 +21,10 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
 
     var showTilePicker by remember { mutableStateOf(false) }
     var pendingGroupType by remember { mutableStateOf<String?>(null) }
+    var editingIndex by remember { mutableStateOf<Int?>(null) }
 
-    // Calcul dynamique de la validité de la main avec les Kongs
     val totalTiles = groupings.sumOf { it.tiles.size }
     val kongCount = groupings.count { it is Grouping.Kong }
-    // Une main standard fait 14 tuiles, +1 tuile par Kong présent
     val isValidHandSize = totalTiles == (14 + kongCount)
 
     Scaffold(
@@ -35,7 +34,10 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
             item {
                 Text("Main ($totalTiles/${14 + kongCount} tuiles)")
                 LazyRow(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    items(groupings) { group -> GroupCard(group) }
+                    // Utilisation de itemsIndexed pour gérer l'index au clic
+                    itemsIndexed(groupings) { index, group ->
+                        GroupCard(group = group, onClick = { editingIndex = index })
+                    }
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -64,18 +66,12 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = {
-                        val winningTile = groupings.find { it is Grouping.Pair }?.tiles?.first()
-                            ?: groupings.lastOrNull()?.tiles?.last()
-
-                        if (winningTile != null) {
-                            viewModel.calculate(winningTile)
-                        }
+                        val winningTile = groupings.lastOrNull()?.tiles?.last()
+                        if (winningTile != null) viewModel.calculate(winningTile)
                     },
                     enabled = isValidHandSize,
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Calculer le score")
-                }
+                ) { Text("CALCULER LE SCORE") }
             }
 
             item {
@@ -97,32 +93,79 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
         }
     }
 
+    // Dialogue d'options (Modifier/Supprimer) au clic sur un groupe
+    if (editingIndex != null && !showTilePicker) {
+        val index = editingIndex!!
+        AlertDialog(
+            onDismissRequest = { editingIndex = null },
+            title = { Text("Modifier le groupe") },
+            text = { Text("Voulez-vous supprimer ce groupe ou le remplacer ?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingGroupType = when(groupings[index]) {
+                        is Grouping.Pair -> "Pair"
+                        is Grouping.Chow -> "Chow"
+                        is Grouping.Kong -> "Kong"
+                        else -> "Pung"
+                    }
+                    showTilePicker = true
+                }) { Text("Remplacer") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.removeGrouping(index)
+                        editingIndex = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text("Supprimer") }
+            }
+        )
+    }
+
     if (showTilePicker) {
         GroupCreationDialog(
             type = pendingGroupType ?: "Pung",
-            onDismiss = { showTilePicker = false },
+            onDismiss = {
+                showTilePicker = false
+                editingIndex = null
+            },
             onConfirm = { tile, isExposed ->
                 val group = when (pendingGroupType) {
                     "Pair" -> Grouping.Pair(listOf(tile, tile), isExposed)
                     "Chow" -> {
                         val first = tile as Tile.Numbered
-                        val list: List<Tile.Numbered> = listOf(
-                            first,
-                            first.copy(value = first.value + 1),
-                            first.copy(value = first.value + 2)
-                        )
-                        Grouping.Chow(list, isExposed)
+                        Grouping.Chow(listOf(first, first.copy(value = first.value + 1), first.copy(first.value + 2)), isExposed)
                     }
                     "Kong" -> Grouping.Kong(listOf(tile, tile, tile, tile), isExposed)
                     else -> Grouping.Pung(listOf(tile, tile, tile), isExposed)
                 }
-                viewModel.addGrouping(group)
+
+                if (editingIndex != null) {
+                    viewModel.updateGrouping(editingIndex!!, group)
+                    editingIndex = null
+                } else {
+                    viewModel.addGrouping(group)
+                }
                 showTilePicker = false
             }
         )
     }
 }
 
+@Composable
+fun GroupCard(group: Grouping, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.padding(4.dp)
+    ) {
+        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(if (group.isExposed) "EXP" else "HID", style = MaterialTheme.typography.labelSmall)
+            Text(getTileLabel(group.tiles.first()))
+            Text(group.javaClass.simpleName.replace("Grouping$", ""), style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
 @Composable
 fun <T : Enum<T>> EnumSelector(label: String, values: Array<T>, selected: T, onSelect: (T) -> Unit) {
     var expanded by remember { mutableStateOf(false) }

@@ -42,4 +42,22 @@ class ManualScorerViewModel(private val engine: ScoringEngine) : ViewModel() {
         )
         _scoreResult.value = engine.calculateScore(hand)
     }
+
+    fun removeGrouping(index: Int) {
+        val current = _groupings.value.toMutableList()
+        if (index in current.indices) {
+            current.removeAt(index)
+            _groupings.value = current
+            _scoreResult.value = null
+        }
+    }
+
+    fun updateGrouping(index: Int, newGrouping: Grouping) {
+        val current = _groupings.value.toMutableList()
+        if (index in current.indices) {
+            current[index] = newGrouping
+            _groupings.value = current
+            _scoreResult.value = null
+        }
+    }
 }
