@@ -1,5 +1,8 @@
 package com.ascomany.camerajong.ui.manual
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -18,11 +21,13 @@ import com.ascomany.camerajong.ui.components.getTileLabel
 fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
     val groupings by viewModel.groupings.collectAsState()
     val result by viewModel.scoreResult.collectAsState()
+    val winningTile by viewModel.winningTile.collectAsState()
 
     var showTilePicker by remember { mutableStateOf(false) }
     var pendingGroupType by remember { mutableStateOf<String?>(null) }
     var editingIndex by remember { mutableStateOf<Int?>(null) }
 
+    // Calcul de la validité : 14 tuiles + 1 par Kong
     val totalTiles = groupings.sumOf { it.tiles.size }
     val kongCount = groupings.count { it is Grouping.Kong }
     val isValidHandSize = totalTiles == (14 + kongCount)
@@ -33,10 +38,19 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
         LazyColumn(modifier = Modifier.padding(padding).padding(16.dp)) {
             item {
                 Text("Main ($totalTiles/${14 + kongCount} tuiles)")
-                LazyRow(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                    // Utilisation de itemsIndexed pour gérer l'index au clic
+                Text("Clic sur une tuile = Hu | Appui long = Modifier", style = MaterialTheme.typography.labelSmall)
+
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     itemsIndexed(groupings) { index, group ->
-                        GroupCard(group = group, onClick = { editingIndex = index })
+                        GroupCard(
+                            group = group,
+                            selectedWinningTile = winningTile,
+                            onTileClick = { viewModel.setWinningTile(it) },
+                            onLongClick = { editingIndex = index }
+                        )
                     }
                 }
 
@@ -65,10 +79,7 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = {
-                        val winningTile = groupings.lastOrNull()?.tiles?.last()
-                        if (winningTile != null) viewModel.calculate(winningTile)
-                    },
+                    onClick = { viewModel.calculate() },
                     enabled = isValidHandSize,
                     modifier = Modifier.fillMaxWidth()
                 ) { Text("CALCULER LE SCORE") }
@@ -93,7 +104,7 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
         }
     }
 
-    // Dialogue d'options (Modifier/Supprimer) au clic sur un groupe
+    // Menu Modification / Suppression
     if (editingIndex != null && !showTilePicker) {
         val index = editingIndex!!
         AlertDialog(
@@ -153,19 +164,44 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun GroupCard(group: Grouping, onClick: () -> Unit) {
+fun GroupCard(
+    group: Grouping,
+    selectedWinningTile: Tile?,
+    onTileClick: (Tile) -> Unit,
+    onLongClick: () -> Unit
+) {
     Card(
-        onClick = onClick,
-        modifier = Modifier.padding(4.dp)
+        modifier = Modifier.combinedClickable(
+            onClick = { /* Le clic court est géré par les tuiles individuelles */ },
+            onLongClick = onLongClick
+        )
     ) {
         Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(if (group.isExposed) "EXP" else "HID", style = MaterialTheme.typography.labelSmall)
-            Text(getTileLabel(group.tiles.first()))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                group.tiles.forEach { tile ->
+                    val isWinning = tile == selectedWinningTile
+                    Surface(
+                        onClick = { onTileClick(tile) },
+                        color = if (isWinning) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
+                        shape = MaterialTheme.shapes.extraSmall,
+                        border = if (isWinning) BorderStroke(2.dp, MaterialTheme.colorScheme.error) else null,
+                        modifier = Modifier.size(32.dp, 44.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(getTileLabel(tile), style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
             Text(group.javaClass.simpleName.replace("Grouping$", ""), style = MaterialTheme.typography.labelSmall)
         }
     }
 }
+
 @Composable
 fun <T : Enum<T>> EnumSelector(label: String, values: Array<T>, selected: T, onSelect: (T) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
@@ -185,17 +221,6 @@ fun <T : Enum<T>> EnumSelector(label: String, values: Array<T>, selected: T, onS
 }
 
 @Composable
-fun GroupCard(group: Grouping) {
-    Card(modifier = Modifier.padding(4.dp)) {
-        Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(if (group.isExposed) "EXP" else "HID", style = MaterialTheme.typography.labelSmall)
-            Text(getTileLabel(group.tiles.first()))
-            Text(group.javaClass.simpleName, style = MaterialTheme.typography.labelSmall)
-        }
-    }
-}
-
-@Composable
 fun GroupCreationDialog(type: String, onDismiss: () -> Unit, onConfirm: (Tile, Boolean) -> Unit) {
     var isExposed by remember { mutableStateOf(false) }
     AlertDialog(
@@ -205,13 +230,11 @@ fun GroupCreationDialog(type: String, onDismiss: () -> Unit, onConfirm: (Tile, B
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = isExposed, onCheckedChange = { isExposed = it })
-                    Text("Groupe exposé (Mélange)")
+                    Text("Groupe exposé (Mélange / Discard)")
                 }
-                TilePicker { selectedTile -> onConfirm(selectedTile, isExposed) }
+                TilePicker { onConfirm(it, isExposed) }
             }
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Annuler") }
-        }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Annuler") } }
     )
 }
