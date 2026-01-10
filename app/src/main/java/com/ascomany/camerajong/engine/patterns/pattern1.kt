@@ -139,7 +139,7 @@ val pattern1 = listOf(
         description = "Winning with a fresh tile picked from the wall.",
         points = 1,
         excludedPatternIds = emptyList(),
-        check = { hand -> if (hand.winType == WinType.SELF_DRAWN) 1 else 0 }
+        check = { hand -> if (hand.winType == WinType.SELF_DRAWN || hand.winType == WinType.KONG_REPLACEMENT) 1 else 0 }
     ),
     Pattern(
         id = 81,

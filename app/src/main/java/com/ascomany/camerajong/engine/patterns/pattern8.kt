@@ -90,7 +90,7 @@ val pattern8 = listOf(
         description = "Making mahjong on a pick of the very last tile of the wall.",
         points = 8,
         excludedPatternIds = listOf(80), // Self-Drawn
-        check = { hand -> if (hand.isLastTile && hand.winType == WinType.SELF_DRAWN) 1 else 0 }
+        check = { hand -> if (hand.isLastTile && (hand.winType == WinType.SELF_DRAWN || hand.winType == WinType.KONG_REPLACEMENT )) 1 else 0 }
     ),
     Pattern(
         id = 45,
