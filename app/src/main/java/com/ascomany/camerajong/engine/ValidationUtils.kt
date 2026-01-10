@@ -1,3 +1,4 @@
+// Utilitary functions to check the validity of groupings
 package com.ascomany.camerajong.engine
 
 fun isValidChow(tiles: List<Tile.Numbered>): Boolean {
