@@ -1,4 +1,4 @@
-// Class of tiles in Mahjong
+// Defining the class of tiles
 
 package com.ascomany.camerajong.engine
 
