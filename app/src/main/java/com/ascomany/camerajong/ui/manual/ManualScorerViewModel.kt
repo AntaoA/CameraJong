@@ -18,8 +18,34 @@ class ManualScorerViewModel(private val engine: ScoringEngine) : ViewModel() {
     var prevalentWind = Wind.EAST
 
     fun addGrouping(grouping: Grouping) {
-        if (_groupings.value.sumOf { it.tiles.size } + grouping.tiles.size <= 14) {
+        val currentTiles = _groupings.value.sumOf { it.tiles.size }
+        val currentKongs = _groupings.value.count { it is Grouping.Kong }
+
+        // Calcul du nouveau maximum autorisé
+        val nextIsKong = grouping is Grouping.Kong
+        val maxAllowed = 14 + currentKongs + (if (nextIsKong) 1 else 0)
+
+        if (currentTiles + grouping.tiles.size <= maxAllowed) {
             _groupings.value += grouping
+            _scoreResult.value = null
+        }
+    }
+
+    fun removeGrouping(index: Int) {
+        val current = _groupings.value.toMutableList()
+        if (index in current.indices) {
+            current.removeAt(index)
+            _groupings.value = current
+            _scoreResult.value = null
+        }
+    }
+
+    fun updateGrouping(index: Int, newGrouping: Grouping) {
+        val current = _groupings.value.toMutableList()
+        if (index in current.indices) {
+            current[index] = newGrouping
+            _groupings.value = current
+            _scoreResult.value = null
         }
     }
 
@@ -41,23 +67,5 @@ class ManualScorerViewModel(private val engine: ScoringEngine) : ViewModel() {
             isLastTile = false
         )
         _scoreResult.value = engine.calculateScore(hand)
-    }
-
-    fun removeGrouping(index: Int) {
-        val current = _groupings.value.toMutableList()
-        if (index in current.indices) {
-            current.removeAt(index)
-            _groupings.value = current
-            _scoreResult.value = null
-        }
-    }
-
-    fun updateGrouping(index: Int, newGrouping: Grouping) {
-        val current = _groupings.value.toMutableList()
-        if (index in current.indices) {
-            current[index] = newGrouping
-            _groupings.value = current
-            _scoreResult.value = null
-        }
     }
 }
