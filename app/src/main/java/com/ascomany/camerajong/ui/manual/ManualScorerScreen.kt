@@ -22,12 +22,18 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
     var showTilePicker by remember { mutableStateOf(false) }
     var pendingGroupType by remember { mutableStateOf<String?>(null) }
 
+    // Calcul dynamique de la validité de la main avec les Kongs
+    val totalTiles = groupings.sumOf { it.tiles.size }
+    val kongCount = groupings.count { it is Grouping.Kong }
+    // Une main standard fait 14 tuiles, +1 tuile par Kong présent
+    val isValidHandSize = totalTiles == (14 + kongCount)
+
     Scaffold(
         topBar = { TopAppBar(title = { Text("MCR Scorer") }) }
     ) { padding ->
         LazyColumn(modifier = Modifier.padding(padding).padding(16.dp)) {
             item {
-                Text("Main (${groupings.sumOf { it.tiles.size }}/14 tuiles)")
+                Text("Main ($totalTiles/${14 + kongCount} tuiles)")
                 LazyRow(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                     items(groupings) { group -> GroupCard(group) }
                 }
@@ -36,6 +42,7 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
                     Button(onClick = { pendingGroupType = "Pair"; showTilePicker = true }) { Text("Paire") }
                     Button(onClick = { pendingGroupType = "Chow"; showTilePicker = true }) { Text("Chow") }
                     Button(onClick = { pendingGroupType = "Pung"; showTilePicker = true }) { Text("Pung") }
+                    Button(onClick = { pendingGroupType = "Kong"; showTilePicker = true }) { Text("Kong") }
                 }
 
                 TextButton(
@@ -53,12 +60,10 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
                 EnumSelector("Prevalent", Wind.entries.toTypedArray(), viewModel.prevalentWind) { viewModel.prevalentWind = it }
             }
 
-            // --- LE BOUTON EST MAINTENANT ICI (Juste après les paramètres) ---
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = {
-                        // Sécurité : On prend la première tuile de la paire comme winningTile par défaut
                         val winningTile = groupings.find { it is Grouping.Pair }?.tiles?.first()
                             ?: groupings.lastOrNull()?.tiles?.last()
 
@@ -66,7 +71,7 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
                             viewModel.calculate(winningTile)
                         }
                     },
-                    enabled = groupings.sumOf { it.tiles.size } == 14,
+                    enabled = isValidHandSize,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Calculer le score")
@@ -75,9 +80,13 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
 
             item {
                 result?.let {
-                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                    ) {
                         Column(Modifier.padding(16.dp)) {
                             Text("Total: ${it.totalPoints} pts", style = MaterialTheme.typography.headlineMedium)
+                            HorizontalDivider(Modifier.padding(vertical = 8.dp))
                             it.detailedPatterns.forEach { p ->
                                 Text("${p.name}: ${p.points} pts x${p.count}")
                             }
@@ -104,6 +113,7 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
                         )
                         Grouping.Chow(list, isExposed)
                     }
+                    "Kong" -> Grouping.Kong(listOf(tile, tile, tile, tile), isExposed)
                     else -> Grouping.Pung(listOf(tile, tile, tile), isExposed)
                 }
                 viewModel.addGrouping(group)
