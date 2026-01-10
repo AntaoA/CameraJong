@@ -8,6 +8,6 @@ data class Pattern(
     val description: String,
     val points: Int,
     val isSpecialStructure: Boolean = false,
-    val excludedPatternIds: List<String> = emptyList(),
+    val excludedPatternIds: List<Int> = emptyList(),
     val check: (WinningHand) -> Int // Number of occurrences of the pattern (useful for patterns that can be present more than once)
 )
