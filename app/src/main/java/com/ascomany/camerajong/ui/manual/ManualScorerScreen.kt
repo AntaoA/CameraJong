@@ -22,6 +22,8 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
     val groupings by viewModel.groupings.collectAsState()
     val result by viewModel.scoreResult.collectAsState()
     val winningTile by viewModel.winningTile.collectAsState()
+    val overLimitTiles = remember(groupings) { viewModel.getOverLimitTiles() }
+    val isSizeInvalid = remember(groupings) { viewModel.isHandSizeInvalid() }
 
     var showTilePicker by remember { mutableStateOf(false) }
     var pendingGroupType by remember { mutableStateOf<String?>(null) }
@@ -35,19 +37,27 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("MCR Scorer") }) }
     ) { padding ->
-        LazyColumn(modifier = Modifier.padding(padding).padding(16.dp)) {
+        LazyColumn(modifier = Modifier
+            .padding(padding)
+            .padding(16.dp)) {
             item {
-                Text("Main ($totalTiles/${14 + kongCount} tuiles)")
+                Text(
+                    text = "Main ($totalTiles/${14 + kongCount} tuiles)",
+                    color = if (isSizeInvalid) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+                )
                 Text("Clic sur une tuile = Hu | Appui long = Modifier", style = MaterialTheme.typography.labelSmall)
 
                 LazyRow(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     itemsIndexed(groupings) { index, group ->
                         GroupCard(
                             group = group,
                             selectedWinningTile = winningTile,
+                            overLimitTiles = overLimitTiles, // <--- Passez la variable ici
                             onTileClick = { viewModel.setWinningTile(it) },
                             onLongClick = { editingIndex = index }
                         )
@@ -88,7 +98,9 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
             item {
                 result?.let {
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                     ) {
                         Column(Modifier.padding(16.dp)) {
@@ -169,14 +181,18 @@ fun ManualScorerScreen(viewModel: ManualScorerViewModel) {
 fun GroupCard(
     group: Grouping,
     selectedWinningTile: Tile?,
+    overLimitTiles: Set<Tile>,
     onTileClick: (Tile) -> Unit,
     onLongClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.combinedClickable(
-            onClick = { /* Le clic court est géré par les tuiles individuelles */ },
+            onClick = { /* ... */ },
             onLongClick = onLongClick
-        )
+        ),
+        // Bordure rouge si le groupe contient une erreur
+        border = if (group.tiles.any { it in overLimitTiles })
+            BorderStroke(1.dp, MaterialTheme.colorScheme.error) else null
     ) {
         Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(if (group.isExposed) "EXP" else "HID", style = MaterialTheme.typography.labelSmall)
@@ -184,15 +200,26 @@ fun GroupCard(
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 group.tiles.forEach { tile ->
                     val isWinning = tile == selectedWinningTile
+                    val isOverLimit = tile in overLimitTiles // Vérification d'erreur
+
                     Surface(
                         onClick = { onTileClick(tile) },
-                        color = if (isWinning) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
+                        color = when {
+                            tile in overLimitTiles -> MaterialTheme.colorScheme.error // Rouge si > 4 exemplaires
+                            tile == selectedWinningTile -> MaterialTheme.colorScheme.errorContainer // Bleu/Rose si gagnante
+                            else -> MaterialTheme.colorScheme.surfaceVariant
+                        },
                         shape = MaterialTheme.shapes.extraSmall,
                         border = if (isWinning) BorderStroke(2.dp, MaterialTheme.colorScheme.error) else null,
                         modifier = Modifier.size(32.dp, 44.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(getTileLabel(tile), style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                text = getTileLabel(tile),
+                                style = MaterialTheme.typography.labelSmall,
+                                // Texte blanc si la tuile est rouge d'erreur
+                                color = if (isOverLimit) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -202,10 +229,13 @@ fun GroupCard(
     }
 }
 
+
 @Composable
 fun <T : Enum<T>> EnumSelector(label: String, values: Array<T>, selected: T, onSelect: (T) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Box(Modifier
+        .fillMaxWidth()
+        .padding(vertical = 4.dp)) {
         OutlinedButton(onClick = { expanded = true }, modifier = Modifier.fillMaxWidth()) {
             Text("$label: ${selected.name}")
         }

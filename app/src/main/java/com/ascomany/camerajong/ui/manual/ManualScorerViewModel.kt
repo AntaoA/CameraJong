@@ -27,21 +27,19 @@ class ManualScorerViewModel(private val engine: ScoringEngine) : ViewModel() {
     var seatWind by mutableStateOf(Wind.EAST)
     var prevalentWind by mutableStateOf(Wind.EAST)
 
-    /**
-     * Ajoute un groupe avec une limite de tuiles dynamique (14 + 1 par Kong).
-     */
+
     fun addGrouping(grouping: Grouping) {
-        val currentTiles = _groupings.value.sumOf { it.tiles.size }
-        val currentKongs = _groupings.value.count { it is Grouping.Kong }
+        // On ajoute directement sans vérifier les limites
+        _groupings.value += grouping
+        _winningTile.value = grouping.tiles.last()
+        _scoreResult.value = null
+    }
 
-        // Un Kong porte le total à 15 tuiles, deux Kongs à 16, etc.
-        val nextIsKong = grouping is Grouping.Kong
-        val maxAllowed = 14 + currentKongs + (if (nextIsKong) 1 else 0)
-
-        if (currentTiles + grouping.tiles.size <= maxAllowed) {
-            _groupings.value += grouping
-            // Définit par défaut la dernière tuile ajoutée comme tuile gagnante
-            _winningTile.value = grouping.tiles.last()
+    fun updateGrouping(index: Int, newGrouping: Grouping) {
+        val current = _groupings.value.toMutableList()
+        if (index in current.indices) {
+            current[index] = newGrouping
+            _groupings.value = current
             _scoreResult.value = null
         }
     }
@@ -53,18 +51,6 @@ class ManualScorerViewModel(private val engine: ScoringEngine) : ViewModel() {
         val current = _groupings.value.toMutableList()
         if (index in current.indices) {
             current.removeAt(index)
-            _groupings.value = current
-            _scoreResult.value = null
-        }
-    }
-
-    /**
-     * Remplace un groupe existant (Modification).
-     */
-    fun updateGrouping(index: Int, newGrouping: Grouping) {
-        val current = _groupings.value.toMutableList()
-        if (index in current.indices) {
-            current[index] = newGrouping
             _groupings.value = current
             _scoreResult.value = null
         }
@@ -84,6 +70,22 @@ class ManualScorerViewModel(private val engine: ScoringEngine) : ViewModel() {
         _groupings.value = emptyList()
         _winningTile.value = null
         _scoreResult.value = null
+    }
+
+    // Identifie les tuiles présentes plus de 4 fois
+    fun getOverLimitTiles(): Set<Tile> {
+        return _groupings.value
+            .flatMap { it.tiles }
+            .groupBy { it }
+            .filter { it.value.size > 4 }
+            .keys
+    }
+
+    // Vérifie si la taille totale est correcte (14 + Kongs)
+    fun isHandSizeInvalid(): Boolean {
+        val totalTiles = _groupings.value.sumOf { it.tiles.size }
+        val kongCount = _groupings.value.count { it is Grouping.Kong }
+        return totalTiles != (14 + kongCount)
     }
 
     /**
@@ -107,4 +109,6 @@ class ManualScorerViewModel(private val engine: ScoringEngine) : ViewModel() {
             _scoreResult.value = engine.calculateScore(hand)
         }
     }
+
+
 }
